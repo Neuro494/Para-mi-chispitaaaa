@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Para ti Chispita 💖</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    height: 100%;
+    background: black;
+    font-family: "Segoe UI", sans-serif;
+    touch-action: none;
+  }
+  #mensaje {
+    position: absolute;
+    top: 30px;
+    width: 100%;
+    text-align: center;
+    font-size: 22px;
+    font-weight: bold;
+    color: pink;
+    text-shadow: 0 0 10px #ff69b4, 0 0 20px #ffb6c1;
+    z-index: 10;
+  }
+  canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+  }
+</style>
+</head>
+<body>
+<div id="mensaje">Estas flores y luces son para ti, mi vida ✨</div>
+<canvas id="espacio"></canvas>
+<script>
+const canvas = document.getElementById("espacio");
+const ctx = canvas.getContext("2d");
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
+
+const W = () => canvas.width;
+const H = () => canvas.height;
+
+// --- estrellas fijas ---
+let estrellas = Array.from({length: 180}, () => ({
+  x: Math.random() * W(),
+  y: Math.random() * H(),
+  r: Math.random() * 1.2,
+  alpha: Math.random()
+}));
+
+// --- estrellas fugaces ---
+let fugaces = [];
+
+// --- claveles ---
+let claveles = [];
+let numClaveles = 5;
+function resetClaveles() {
+  claveles = [];
+  for (let i = 0; i < numClaveles; i++) {
+    claveles.push({
+      x: (i + 1) * W() / (numClaveles + 1),
+      y: H() - 60,
+      scale: 0,
+      grown: false
+    });
+  }
+}
+resetClaveles();
+
+// --- luciérnagas ---
+let luciernagas = [];
+let numLuciernagas = 100;
+
+// generar puntos de la palabra
+let palabra = "Chispita";
+let palabraCanvas = document.createElement("canvas");
+let pw = 280, ph = 80;
+palabraCanvas.width = pw;
+palabraCanvas.height = ph;
+let pctx = palabraCanvas.getContext("2d");
+pctx.fillStyle = "white";
+pctx.font = "bold 60px Arial";
+pctx.fillText(palabra, 10, 60);
+let puntosPalabra = [];
+let data = pctx.getImageData(0, 0, pw, ph).data;
+for (let y = 0; y < ph; y += 3) {
+  for (let x = 0; x < pw; x += 3) {
+    let idx = (y * pw + x) * 4;
+    if (data[idx + 3] > 128) {
+      puntosPalabra.push({x: x + W()/2 - pw/2, y: y + H()/3});
+    }
+  }
+}
+
+for (let i = 0; i < numLuciernagas; i++) {
+  luciernagas.push({
+    x: W()/2,
+    y: H(),
+    tx: Math.random() * W(),
+    ty: Math.random() * H()/2,
+    state: "free"
+  });
+}
+
+let ciclo = 0;
+
+function animar() {
+  ctx.clearRect(0, 0, W(), H());
+
+  // estrellas
+  estrellas.forEach(s => {
+    s.alpha += (Math.random() - 0.5) * 0.05;
+    s.alpha = Math.max(0, Math.min(1, s.alpha));
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(255,255,255,${s.alpha})`;
+    ctx.fill();
+  });
+
+  // fugaces
+  if (Math.random() < 0.004) {
+    fugaces.push({
+      x: Math.random() * W() * 0.5,
+      y: Math.random() * H() * 0.3,
+      vx: 7,
+      vy: 3,
+      life: 0
+    });
+  }
+  fugaces.forEach((f, i) => {
+    ctx.beginPath();
+    ctx.moveTo(f.x, f.y);
+    ctx.lineTo(f.x - 25, f.y - 12);
+    ctx.strokeStyle = "white";
+    ctx.stroke();
+    f.x += f.vx;
+    f.y += f.vy;
+    f.life++;
+    if (f.life > 50) fugaces.splice(i,1);
+  });
+
+  // claveles
+  claveles.forEach(c => {
+    if (!c.grown) {
+      c.scale += 0.02;
+      if (c.scale >= 1) {c.scale = 1; c.grown = true;}
+    }
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.scale(c.scale, c.scale);
+    ctx.beginPath();
+    ctx.arc(0,0,18,0,Math.PI*2);
+    ctx.fillStyle = "pink";
+    ctx.shadowColor = "hotpink";
+    ctx.shadowBlur = 18;
+    ctx.fill();
+    ctx.restore();
+  });
+
+  // luciérnagas
+  ciclo++;
+  let faseDur = 500;
+  let fase = Math.floor(ciclo / faseDur) % 3;
+  luciernagas.forEach((l,i) => {
+    if (fase === 0) { // libre
+      if (Math.random() < 0.01) {
+        l.tx = Math.random() * W();
+        l.ty = Math.random() * H()/2;
+      }
+    } else if (fase === 1) { // formar palabra
+      let p = puntosPalabra[i % puntosPalabra.length];
+      l.tx = p.x;
+      l.ty = p.y;
+    } else { // dispersar
+      if (Math.random() < 0.02) {
+        l.tx = Math.random() * W();
+        l.ty = Math.random() * H()/2;
+      }
+    }
+    l.x += (l.tx - l.x) * 0.03;
+    l.y += (l.ty - l.y) * 0.03;
+    ctx.beginPath();
+    ctx.arc(l.x, l.y, 3, 0, Math.PI*2);
+    ctx.fillStyle = "rgba(0,255,100," + (0.6 + Math.random()*0.4) + ")";
+    ctx.shadowColor = "lime";
+    ctx.shadowBlur = 15;
+    ctx.fill();
+  });
+
+  requestAnimationFrame(animar);
+}
+
+animar();
+</script>
+</body>
+</html>
